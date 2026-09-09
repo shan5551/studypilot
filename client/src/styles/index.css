@@ -35,7 +35,12 @@
     @apply btn bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-900 dark:hover:bg-red-900/40;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500;
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:[color-scheme:dark];
+  }
+  /* Dark mode: make native <select> dropdown popup, date picker, etc. dark too */
+  .dark select option {
+    background-color: #0f172a; /* slate-900 */
+    color: #e2e8f0; /* slate-200 */
   }
   .label {
     @apply mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300;

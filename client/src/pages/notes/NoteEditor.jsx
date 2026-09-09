@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/LoadingSpinner';
+import { Modal } from '../../components/ui/Modal';
 import {
   ArrowLeft, Save, Sparkles, Bold, Italic, Heading2, List, ListOrdered,
   Code, Eye, PencilLine, Star, StarOff, Trash2, MessageSquarePlus, X, Check
