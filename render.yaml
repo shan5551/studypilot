@@ -1,16 +1,20 @@
 services:
   - type: web
-    name: studypilot-api
+    name: studypilot
     runtime: node
     region: oregon
+    plan: free
     rootDir: server
-    buildCommand: npm install
+    # Builds the API deps, then the React client (for static serving).
+    buildCommand: npm install && cd ../client && npm install && CI=false npm run build
     startCommand: node server.js
-    envVars:
+    env:
+      - key: NODE_ENV
+        value: production
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_EXPIRE
         value: "7d"
       - key: AI_API_KEY
@@ -19,6 +23,12 @@ services:
         value: openai
       - key: CLIENT_URL
         sync: false
-      - key: NODE_ENV
-        value: production
+      # Google OAuth (set these to enable "Continue with Google")
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
     healthCheckPath: /api/health
+    # Free plan spins down after inactivity — the first request may be slow.

@@ -128,7 +128,7 @@ export default function Landing() {
               Get Started <ArrowRight className="h-4 w-4" />
             </Link>
             <button onClick={() => navigate('/login')} className="btn-secondary px-6 py-3 text-base w-full sm:w-auto">
-              View Demo
+              Log in
             </button>
           </div>
 
