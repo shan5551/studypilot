@@ -24,8 +24,10 @@ services:
       # Free AI via Groq (OpenAI-compatible endpoint)
       - key: AI_BASE_URL
         value: https://api.groq.com/openai/v1
+      # Note: all Llama models on Groq moved to Enterprise-only (Sep 2026).
+      # openai/gpt-oss-20b is self-serve/free-tier.
       - key: AI_MODEL
-        value: llama-3.3-70b-versatile
+        value: openai/gpt-oss-20b
       - key: CLIENT_URL
         sync: false
       # Google OAuth (set these to enable "Continue with Google")
