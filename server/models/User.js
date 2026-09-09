@@ -20,9 +20,19 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      // Optional — Google (OAuth) accounts have no password.
       minlength: [8, 'Password must be at least 8 characters'],
       select: false
+    },
+    provider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local'
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true
     },
     settings: {
       theme: {

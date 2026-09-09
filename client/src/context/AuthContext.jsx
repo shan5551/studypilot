@@ -50,6 +50,16 @@ export function AuthProvider({ children }) {
     return res.data.user;
   }, []);
 
+  // Complete a Google OAuth login: store token, then fetch the user.
+  const googleSignIn = useCallback(async (googleToken) => {
+    localStorage.setItem('sp_token', googleToken);
+    setToken(googleToken);
+    const res = await authApi.me();
+    setUser(res.data.user);
+    localStorage.setItem('sp_user', JSON.stringify(res.data.user));
+    return res.data.user;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('sp_token');
     localStorage.removeItem('sp_user');
@@ -63,7 +73,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, googleSignIn, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

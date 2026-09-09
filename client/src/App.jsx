@@ -6,6 +6,7 @@ import { PageLoader } from './components/ui/LoadingSpinner';
 import Landing from './pages/public/Landing';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import GoogleCallback from './pages/auth/GoogleCallback';
 
 // Layout & protected
 import AppLayout from './components/layout/AppLayout';
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/auth/callback" element={<GoogleCallback />} />
 
       {/* Authenticated */}
       <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
