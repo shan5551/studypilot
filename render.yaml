@@ -8,7 +8,7 @@ services:
     # Builds the API deps, then the React client (for static serving).
     buildCommand: npm install && cd ../client && npm install && CI=false npm run build
     startCommand: node server.js
-    env:
+    envVars:
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
