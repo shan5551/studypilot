@@ -6,7 +6,7 @@
 
 ## Live Demo
 
-[Deployed link](#) — *(add your Vercel/Render URLs here)*
+[Deployed link](#) — https://studypilot-ellv.onrender.com
 
 ---
 
