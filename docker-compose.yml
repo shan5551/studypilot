@@ -1,0 +1,16 @@
+version: '3.8'
+
+# Optional: spin up a local MongoDB for development.
+# Run:  docker compose up -d
+services:
+  mongo:
+    image: mongo:7
+    container_name: studypilot-mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
