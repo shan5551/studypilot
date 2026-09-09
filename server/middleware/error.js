@@ -3,6 +3,12 @@ const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
+  // Always log the real error so it's visible in server logs (Render, etc.),
+  // even though the response body stays generic in production.
+  console.error(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  if (err.stack) console.error(err.stack);
+  else console.error(err);
+
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
     error = { statusCode: 400, message: 'Resource not found' };
