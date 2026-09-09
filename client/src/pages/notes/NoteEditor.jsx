@@ -11,8 +11,10 @@ import { Spinner } from '../../components/ui/LoadingSpinner';
 import { Modal } from '../../components/ui/Modal';
 import {
   ArrowLeft, Save, Sparkles, Bold, Italic, Heading2, List, ListOrdered,
-  Code, Eye, PencilLine, Star, StarOff, Trash2, MessageSquarePlus, X, Check
+  Code, Eye, PencilLine, Star, StarOff, Trash2, MessageSquarePlus, X, Check,
+  Paperclip, FileText, Image as ImageIcon, Download, Loader2
 } from 'lucide-react';
+import MermaidDiagram from '../../components/ui/MermaidDiagram';
 import { wordCount, charCount, timeAgo } from '../../utils/format';
 
 const SAVE_DELAY = 1500;
@@ -36,6 +38,8 @@ export default function NoteEditor() {
   const [lastSaved, setLastSaved] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [mode, setMode] = useState('write'); // write | preview
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
   const { data: subjectsData } = useFetch(() => subjectApi.list());
   const subjects = subjectsData?.subjects || [];
@@ -57,6 +61,7 @@ export default function NoteEditor() {
       setSubject(n.subject?._id || '');
       setFavorite(n.favorite);
       setTags((n.tags || []).join(', '));
+      setAttachments(n.attachments || []);
       setLastSaved(n.updatedAt);
       setLoading(false);
       if (shouldSummarize.current) openSummary(n.content);
@@ -67,9 +72,12 @@ export default function NoteEditor() {
   }, [id]);
 
   // Autosave
+  // Note: we deliberately do NOT mirror `isNew` into saveRef on every render —
+  // `isNew` never changes for a new note (no id), so it would overwrite the
+  // "already created" flag and cause a new note on every save.
   const saveTimer = useRef(null);
   const saveRef = useRef(null);
-  saveRef.current = { isNew, note, title, content, subject, favorite, tags };
+  saveRef.current = { note, title, content, subject, favorite, tags };
 
   const doSave = useCallback(async (silent = true) => {
     const s = saveRef.current;
@@ -82,7 +90,7 @@ export default function NoteEditor() {
     };
     setSaving(true);
     try {
-      if (s.isNew || !s.note) {
+      if (!s.note) {
         const res = await noteApi.create(payload);
         setNote(res.data.note);
         saveRef.current.note = res.data.note;
@@ -180,6 +188,66 @@ export default function NoteEditor() {
     }
   };
 
+  // ---- Attachments (images, PDFs, diagrams) ----
+  const fileInputRef = useRef(null);
+  const MAX_FILE = 8 * 1024 * 1024; // 8 MB
+
+  const handleFilesSelected = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ''; // allow re-selecting the same file
+    if (!files.length) return;
+
+    for (const file of files) {
+      if (file.size > MAX_FILE) {
+        toast.error(`"${file.name}" is too large (max 8 MB)`);
+        continue;
+      }
+      const isImage = file.type.startsWith('image/');
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (!isImage && !isPdf) {
+        toast.error(`"${file.name}" is not supported. Upload images or PDFs.`);
+        continue;
+      }
+      try {
+        setUploading(true);
+        // Make sure the note exists before attaching
+        if (isNew || !saveRef.current.note) await doSave(true);
+        const base64 = await readAsBase64(file);
+        const res = await noteApi.addAttachment(saveRef.current.note._id, {
+          name: file.name,
+          type: file.type || (isPdf ? 'application/pdf' : 'application/octet-stream'),
+          size: file.size,
+          data: base64
+        });
+        setAttachments((prev) => [...prev, res.data.attachment]);
+        toast.success(`Attached ${file.name}`);
+      } catch (err) {
+        toast.error(err.message);
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
+
+  const readAsBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+
+  const handleRemoveAttachment = async (attachId, name) => {
+    try {
+      await noteApi.removeAttachment(saveRef.current.note._id, attachId);
+      setAttachments((prev) => prev.filter((a) => a._id !== attachId));
+      toast.success(`Removed ${name}`);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const attachmentUrl = (a) => `data:${a.type || 'application/octet-stream'};base64,${a.data}`;
+
   // Insert markdown at cursor
   const insertAtCursor = (before, after = '') => {
     const ta = contentRef.current;
@@ -270,11 +338,17 @@ export default function NoteEditor() {
                   </ul>
                 </div>
               )}
+              {summary.diagram && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Diagram</p>
+                  <MermaidDiagram code={summary.diagram} />
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
                 <Button size="sm" variant="secondary" onClick={() => navigate(`/quizzes?source=note&id=${note?._id || saveRef.current.note?._id}`)}>
                   <Sparkles className="h-3.5 w-3.5" /> Quiz from this note
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => summarizeNow({ skipSave: true } || undefined)} disabled={summarizing}>
+                <Button size="sm" variant="ghost" onClick={() => summarizeNow()} disabled={summarizing}>
                   Regenerate
                 </Button>
               </div>
@@ -293,6 +367,10 @@ export default function NoteEditor() {
         <div className="flex items-center gap-2">
           {lastSaved && <span className="text-xs text-slate-400 hidden sm:inline">Saved {saving ? '…' : timeAgo(lastSaved)}</span>}
           {dirty && <span className="text-xs text-slate-400">Unsaved</span>}
+          <input ref={fileInputRef} type="file" accept="application/pdf,image/*" multiple className="hidden" onChange={handleFilesSelected} />
+          <Button size="sm" variant="secondary" onClick={() => fileInputRef.current?.click()} loading={uploading} aria-label="Attach images or PDFs">
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />} Attach
+          </Button>
           <Button size="sm" variant="secondary" onClick={() => setAskOpen(true)} aria-label="Ask AI about this note">
             <MessageSquarePlus className="h-4 w-4" /> Ask AI
           </Button>
@@ -304,6 +382,40 @@ export default function NoteEditor() {
           </Button>
         </div>
       </div>
+
+      {/* Attachments strip */}
+      {attachments.length > 0 && (
+        <div className="card p-4 flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <Paperclip className="h-3.5 w-3.5" /> Attachments
+          </span>
+          {attachments.map((a) => (
+            <div key={a._id} className="group relative flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5">
+              {a.type?.startsWith('image/') ? (
+                <a href={attachmentUrl(a)} target="_blank" rel="noreferrer" title={`Open ${a.name}`} className="flex items-center gap-2">
+                  <img src={attachmentUrl(a)} alt={a.name} className="h-9 w-9 rounded object-cover" />
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[120px] truncate">{a.name}</span>
+                </a>
+              ) : (
+                <a href={attachmentUrl(a)} download={a.name} title={`Download ${a.name}`} className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-red-500 shrink-0" />
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-200 max-w-[120px] truncate">{a.name}</span>
+                </a>
+              )}
+              <a href={attachmentUrl(a)} download={a.name} aria-label={`Download ${a.name}`} className="text-slate-300 hover:text-brand-500 dark:text-slate-500">
+                <Download className="h-3.5 w-3.5" />
+              </a>
+              <button
+                onClick={() => handleRemoveAttachment(a._id, a.name)}
+                aria-label={`Remove ${a.name}`}
+                className="text-slate-300 hover:text-red-500 dark:text-slate-500"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Editor card */}
       <div className="card overflow-hidden">

@@ -50,10 +50,17 @@ Return ONLY valid JSON with this exact structure:
   "keyConcepts": ["concept1", "concept2"],
   "importantPoints": ["point1", "point2"],
   "definitions": [{"term": "...", "definition": "..."}],
-  "takeaways": ["takeaway1", "takeaway2"]
+  "takeaways": ["takeaway1", "takeaway2"],
+  "diagram": "Mermaid flowchart TD code OR null"
 }
 ${lengthGuide[length] || lengthGuide.medium}
-Keep arrays to 3-6 items each.`;
+Keep arrays to 3-6 items each.
+For "diagram": write a small Mermaid "flowchart TD" that visualizes how the topic's parts connect (a process, hierarchy, or flow). Use short node labels (a few words max) — no parentheses, quotes, or special characters inside labels that break Mermaid. IDs must be simple letters like A, B, C. Example:
+flowchart TD
+    A[Concept] --> B[Sub-topic]
+    B --> C{Question}
+    C -- Yes --> D[Result]
+If the note has no meaningful structure to diagram, return null.`;
     const content = await this.generate({
       system,
       messages: [{ role: 'user', content: noteContent.slice(0, 30000) }],

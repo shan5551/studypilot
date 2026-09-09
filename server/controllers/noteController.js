@@ -21,6 +21,7 @@ const getNotes = async (req, res, next) => {
 
     const notes = await Note.find(query)
       .populate('subject', 'name color')
+      .select('-attachments.data') // keep attachment metadata only; base64 stays on single-note fetches
       .sort({ updatedAt: -1 })
       .limit(parseInt(req.query.limit) || 200);
 
@@ -123,4 +124,70 @@ const deleteNote = async (req, res, next) => {
   }
 };
 
-module.exports = { getNotes, getNote, createNote, updateNote, toggleFavorite, deleteNote };
+const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024; // 8 MB
+
+// @desc    Attach a file (already base64-encoded in the JSON body)
+// @route   POST /api/notes/:id/attachments
+// @access  Private
+const addAttachment = async (req, res, next) => {
+  try {
+    const note = await Note.findOne({ _id: req.params.id, user: req.user._id });
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    const { name, type, size, data } = req.body;
+    if (!name || !data) {
+      return res.status(400).json({ success: false, error: 'name and data (base64) are required' });
+    }
+    if (size && size > MAX_ATTACHMENT_BYTES) {
+      return res.status(400).json({ success: false, error: 'File too large (max 8 MB)' });
+    }
+
+    note.attachments.push({
+      name,
+      type: type || 'application/octet-stream',
+      size: size || 0,
+      data
+    });
+    await note.save();
+
+    const saved = note.attachments[note.attachments.length - 1];
+    res.status(201).json({
+      success: true,
+      // return metadata only — keeps the upload response light
+      attachment: {
+        _id: saved._id,
+        name: saved.name,
+        type: saved.type,
+        size: saved.size,
+        addedAt: saved.addedAt
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Remove an attachment
+// @route   DELETE /api/notes/:id/attachments/:attachId
+// @access  Private
+const removeAttachment = async (req, res, next) => {
+  try {
+    const note = await Note.findOne({ _id: req.params.id, user: req.user._id });
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+    const before = note.attachments.length;
+    note.attachments = note.attachments.filter((a) => String(a._id) !== req.params.attachId);
+    if (note.attachments.length === before) {
+      return res.status(404).json({ success: false, error: 'Attachment not found' });
+    }
+    await note.save();
+    res.json({ success: true, message: 'Attachment removed' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getNotes, getNote, createNote, updateNote, toggleFavorite, deleteNote, addAttachment, removeAttachment };

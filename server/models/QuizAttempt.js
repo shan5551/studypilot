@@ -20,7 +20,7 @@ const quizAttemptSchema = new mongoose.Schema(
     quiz: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Quiz',
-      required: true
+      default: null
     },
     subject: {
       type: mongoose.Schema.Types.ObjectId,

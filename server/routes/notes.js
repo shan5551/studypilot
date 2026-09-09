@@ -7,7 +7,9 @@ const {
   createNote,
   updateNote,
   toggleFavorite,
-  deleteNote
+  deleteNote,
+  addAttachment,
+  removeAttachment
 } = require('../controllers/noteController');
 
 router.use(protect);
@@ -22,5 +24,9 @@ router.route('/:id')
   .delete(deleteNote);
 
 router.patch('/:id/favorite', toggleFavorite);
+
+// Attachments (base64 in JSON body; PDFs, images, diagrams)
+router.post('/:id/attachments', addAttachment);
+router.delete('/:id/attachments/:attachId', removeAttachment);
 
 module.exports = router;

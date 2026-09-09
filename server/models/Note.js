@@ -36,6 +36,20 @@ const noteSchema = new mongoose.Schema(
     summary: {
       type: mongoose.Schema.Types.Mixed,
       default: null
+    },
+    // Attached files (images, PDFs, diagrams) stored as base64 in MongoDB —
+    // survives Render's ephemeral disk. Cap sized ~8MB per file.
+    attachments: {
+      type: [
+        {
+          name: { type: String, required: true },
+          type: { type: String, default: 'application/octet-stream' },
+          size: { type: Number, default: 0 },
+          data: { type: String, default: '' },
+          addedAt: { type: Date, default: Date.now }
+        }
+      ],
+      default: []
     }
   },
   {

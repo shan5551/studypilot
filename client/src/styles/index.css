@@ -6,6 +6,11 @@
   html {
     @apply antialiased;
   }
+  /* Dark mode: propagate dark color-scheme to ALL native controls so the
+     <select> dropdown popup, date picker, etc. render dark instead of white. */
+  html.dark {
+    color-scheme: dark;
+  }
   body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';

@@ -82,7 +82,9 @@ export const noteApi = {
   create: (payload) => api('/notes', { method: 'POST', body: payload }),
   update: (id, payload) => api(`/notes/${id}`, { method: 'PUT', body: payload }),
   toggleFavorite: (id) => api(`/notes/${id}/favorite`, { method: 'PATCH' }),
-  remove: (id) => api(`/notes/${id}`, { method: 'DELETE' })
+  remove: (id) => api(`/notes/${id}`, { method: 'DELETE' }),
+  addAttachment: (id, payload) => api(`/notes/${id}/attachments`, { method: 'POST', body: payload }),
+  removeAttachment: (id, attachId) => api(`/notes/${id}/attachments/${attachId}`, { method: 'DELETE' })
 };
 
 export const sessionApi = {

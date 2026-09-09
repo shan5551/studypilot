@@ -10,7 +10,7 @@ import { Spinner } from '../../components/ui/LoadingSpinner';
 import { Modal } from '../../components/ui/Modal';
 import {
   StickyNote, Plus, Search, Star, StarOff, MoreVertical, Pencil,
-  Trash2, Sparkles, BookOpen
+  Trash2, Sparkles, BookOpen, Paperclip
 } from 'lucide-react';
 import { Dropdown, DropdownItem } from '../../components/ui/Dropdown';
 import { timeAgo, excerpt, wordCount } from '../../utils/format';
@@ -132,7 +132,14 @@ export default function Notes() {
               </Link>
 
               <div className="mt-3 flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-                <span>{wordCount(n.content)} words</span>
+                <span className="flex items-center gap-2">
+                  {n.attachments?.length > 0 && (
+                    <span className="flex items-center gap-0.5" title={`${n.attachments.length} attachment(s)`}>
+                      <Paperclip className="h-3 w-3" /> {n.attachments.length}
+                    </span>
+                  )}
+                  <span>{wordCount(n.content)} words</span>
+                </span>
                 <span>{timeAgo(n.updatedAt)}</span>
               </div>
             </div>

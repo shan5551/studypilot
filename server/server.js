@@ -62,7 +62,7 @@ app.use(cors({
 }));
 
 // ─── Body parsing ─────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // ─── Static files (production React build) ───────────────────────
 const clientBuild = path.join(__dirname, '..', 'client', 'dist');

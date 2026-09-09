@@ -60,7 +60,7 @@ export default function Quizzes() {
         </button>
       </div>
 
-      {tab === 'history' ? <QuizHistory /> : <SavedQuizzes onTake={setTakeQuiz} />}
+      {tab === 'history' ? <QuizHistory onGenerate={() => setGenerateOpen(true)} /> : <SavedQuizzes onTake={setTakeQuiz} />}
 
       <GenerateModal open={generateOpen} onClose={() => { setGenerateOpen(false); setSearchParams({}); }} />
       {takeQuiz && <QuizPlayer quiz={takeQuiz} onClose={() => setTakeQuiz(null)} />}
@@ -69,7 +69,7 @@ export default function Quizzes() {
 }
 
 // ---- History ----
-function QuizHistory() {
+function QuizHistory({ onGenerate }) {
   const { data, loading, error, refetch } = useFetch(() => quizApi.attempts());
   const attempts = data?.attempts || [];
 
@@ -96,7 +96,7 @@ function QuizHistory() {
           title="No quiz attempts yet"
           description="Generate a quiz from a note or subject, take it, and your results (including weak topics) will appear here."
           actionLabel="Generate a quiz"
-          onAction={() => document.querySelector('[aria-label="Generate quiz"]')?.click() || null}
+          onAction={onGenerate}
         />
       ) : (
         <div className="card divide-y divide-slate-100 dark:divide-slate-800">
