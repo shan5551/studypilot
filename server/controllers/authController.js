@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
-const { sendEmail } = require('../utils/sendEmail');
+const { sendEmailAsync } = require('../utils/sendEmail');
 const crypto = require('crypto');
 
 // Parse cookie header into an object (keeps us dependency-free).
@@ -41,18 +41,13 @@ const register = async (req, res, next) => {
     });
 
     const link = `${clientUrl()}/verify-email/${verificationToken}`;
-    try {
-      await sendEmail({
-        to: user.email,
-        subject: 'Verify your StudyPilot account',
-        text: `Hi ${user.name},\n\nWelcome to StudyPilot! Please verify your email to activate your account:\n\n${link}\n\nThis link expires in 24 hours.\nIf you didn't create this account, you can ignore this email.`,
-        html: `<p>Hi ${user.name},</p><p>Welcome to StudyPilot! Please verify your email to activate your account:</p><p><a href="${link}">Verify my account</a></p><p>(or open: ${link})</p><p>This link expires in 24 hours.</p>`
-      });
-    } catch (mailErr) {
-      // Email failures must not block registration — the flow stays usable
-      // and a resend option exists. Log for visibility on the server side.
-      console.error(`[mail] verification email failed to send to ${user.email}:`, mailErr.message);
-    }
+    // Fire-and-forget: the response must not wait on the SMTP server.
+    sendEmailAsync({
+      to: user.email,
+      subject: 'Verify your StudyPilot account',
+      text: `Hi ${user.name},\n\nWelcome to StudyPilot! Please verify your email to activate your account:\n\n${link}\n\nThis link expires in 24 hours.\nIf you didn't create this account, you can ignore this email.`,
+      html: `<p>Hi ${user.name},</p><p>Welcome to StudyPilot! Please verify your email to activate your account:</p><p><a href="${link}">Verify my account</a></p><p>(or open: ${link})</p><p>This link expires in 24 hours.</p>`
+    });
 
     res.status(201).json({
       success: true,
@@ -113,7 +108,7 @@ const resendVerification = async (req, res, next) => {
     await user.save();
 
     const link = `${clientUrl()}/verify-email/${verificationToken}`;
-    await sendEmail({
+    sendEmailAsync({
       to: user.email,
       subject: 'Verify your StudyPilot account',
       text: `Hi ${user.name},\n\nHere's a fresh verification link for your StudyPilot account:\n\n${link}\n\nThis link expires in 24 hours.`,
@@ -188,7 +183,7 @@ const forgotPassword = async (req, res, next) => {
     await user.save();
 
     const link = `${clientUrl()}/reset-password/${resetToken}`;
-    await sendEmail({
+    sendEmailAsync({
       to: user.email,
       subject: 'Reset your StudyPilot password',
       text: `Hi ${user.name},\n\nWe received a request to reset your StudyPilot password. Click the link below to set a new one:\n\n${link}\n\nThis link expires in 30 minutes. If you didn't request this, you can safely ignore this email.`,

@@ -18,7 +18,11 @@ function getTransporter() {
     host: SMTP_HOST,
     port: Number(SMTP_PORT || 587),
     secure: SMTP_SECURE === 'true',
-    auth: { user: SMTP_USER, pass: SMTP_PASS }
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    // Fail fast instead of hanging (nodemailer defaults are ~2 minutes).
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000
   });
   return transporter;
 }
@@ -46,4 +50,14 @@ async function sendEmail({ to, subject, text, html }) {
   console.log('────────────────────────────────────────────────────────────\n');
 }
 
-module.exports = { sendEmail };
+// Fire-and-forget delivery helper: sends in the background so an HTTP request
+// NEVER blocks on the mail server (a slow/unreachable SMTP must not make
+// register or forgot-password hang). Outcomes are logged server-side.
+function sendEmailAsync(payload) {
+  sendEmail(payload).then(
+    () => console.log(`[mail] ✓ sent "${payload.subject}" to ${payload.to}`),
+    (err) => console.error(`[mail] ✗ failed to send "${payload.subject}" to ${payload.to}:`, err.message)
+  );
+}
+
+module.exports = { sendEmail, sendEmailAsync };
