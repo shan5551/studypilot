@@ -10,12 +10,16 @@ const nodemailer = require('nodemailer');
 
 let transporter = null;
 
+const dns = require('dns');
+
 function getTransporter() {
   if (transporter) return transporter;
   const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER) return null; // no SMTP configured → log mode
   transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
+    // Use IPv4 explicitly. Some hosts (Render free tier) have no IPv6
+    // egress, and smtp.gmail.com often resolves to IPv6 first → ENETUNREACH.
+    host: (SMTP_HOST_V4 && SMTP_HOST_V4.trim()) || SMTP_HOST,
     port: Number(SMTP_PORT || 587),
     secure: SMTP_SECURE === 'true',
     auth: { user: SMTP_USER, pass: SMTP_PASS },
@@ -25,6 +29,22 @@ function getTransporter() {
     socketTimeout: 20000
   });
   return transporter;
+}
+
+// Resolve the SMTP host's IPv4 addresses once at boot, so a host with no
+// IPv6 egress (Render free tier) connects even when the hostname resolves
+// to IPv6 first. Falls back gracefully if the lookup fails.
+async function resolveSmtpHost(hostname) {
+  if (!hostname) return;
+  try {
+    const addrs = await dns.promises.resolve4(hostname);
+    if (addrs && addrs.length) {
+      process.env.SMTP_HOST_V4 = addrs[0];
+      console.log(`[mail] using IPv4 ${addrs[0]} for ${hostname} (SMTP egress is IPv4-only)`);
+    }
+  } catch (err) {
+    console.warn(`[mail] IPv4 lookup for ${hostname} failed (${err.code || err.message}); will use hostname as-is.`);
+  }
 }
 
 async function sendEmail({ to, subject, text, html }) {
@@ -60,4 +80,4 @@ function sendEmailAsync(payload) {
   );
 }
 
-module.exports = { sendEmail, sendEmailAsync };
+module.exports = { sendEmail, sendEmailAsync, resolveSmtpHost };

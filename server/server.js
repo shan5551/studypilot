@@ -11,6 +11,13 @@ const connectDB = require('./config/db');
 // Load env vars
 dotenv.config();
 
+// Resolve SMTP to an IPv4 address at boot (Render free tier has no IPv6
+// egress; smtp.gmail.com resolves to IPv6 first → ENETUNREACH otherwise).
+const { resolveSmtpHost } = require('./utils/sendEmail');
+if (process.env.SMTP_HOST) {
+  resolveSmtpHost(process.env.SMTP_HOST);
+}
+
 // ─── Startup validation ───────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
