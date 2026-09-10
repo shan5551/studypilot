@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { BookOpen, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { authApi } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 
@@ -34,9 +35,30 @@ export default function Login() {
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (e) {
-      toast.error(e.message || 'Login failed');
+      if (e.status === 403 && e.needsVerification) {
+        // The account exists but its email isn't verified yet — offer to resend.
+        setVerifyEmail(email);
+      } else {
+        toast.error(e.message || 'Login failed');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [verifyEmail, setVerifyEmail] = useState(null);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await authApi.resendVerification(verifyEmail);
+      setResent(true);
+    } catch (e) {
+      toast.error(e.message || 'Could not send the verification link');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -61,6 +83,22 @@ export default function Login() {
           {googleError && (
             <div className="mt-4 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 p-3 text-sm text-red-600 dark:text-red-400">
               {googleError}
+            </div>
+          )}
+
+          {verifyEmail && (
+            <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 p-3 text-sm text-amber-700 dark:text-amber-300">
+              <p className="font-medium mb-1">Please verify your email</p>
+              {resent ? (
+                <p>A fresh verification link has been sent to <span className="font-medium">{verifyEmail}</span>. Check your inbox (and spam).</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p>We sent a verification link to <span className="font-medium">{verifyEmail}</span> when you created your account. Check your inbox (and spam) before logging in.</p>
+                  <button type="button" onClick={handleResend} disabled={resending} className="text-xs font-medium text-amber-800 dark:text-amber-200 underline underline-offset-2 disabled:opacity-50 w-fit">
+                    {resending ? 'Sending…' : 'Send a new link'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -103,6 +141,11 @@ export default function Login() {
               >
                 {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <Link to="/forgot-password" className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                Forgot password?
+              </Link>
             </div>
             <Button type="submit" className="w-full" loading={loading}>
               Log in

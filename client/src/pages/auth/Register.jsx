@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { BookOpen, Check } from 'lucide-react';
+import { BookOpen, Check, MailCheck } from 'lucide-react';
 
 const GoogleIcon = () => (
   <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
@@ -13,6 +13,7 @@ const GoogleIcon = () => (
 );
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { authApi } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 
@@ -28,18 +29,33 @@ export default function Register() {
   const navigate = useNavigate();
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
   const [loading, setLoading] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState(null);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
   const password = watch('password', '');
 
   const onSubmit = async ({ name, email, password }) => {
     setLoading(true);
     try {
       await registerUser(name, email, password);
-      toast.success('Account created — welcome to StudyPilot!');
-      navigate('/dashboard');
+      toast.success('Account created — check your email to verify.');
+      setRegisteredEmail(email);
     } catch (e) {
       toast.error(e.message || 'Registration failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await authApi.resendVerification(registeredEmail);
+      setResent(true);
+    } catch (e) {
+      toast.error(e.message || 'Could not send the verification link');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -55,6 +71,36 @@ export default function Register() {
       </div>
 
       <div className="flex-1 flex items-center justify-center p-4 pb-12">
+        {registeredEmail ? (
+          <div className="card w-full max-w-sm p-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950">
+              <MailCheck className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h1 className="mt-4 text-xl font-bold text-slate-900 dark:text-slate-100">Check your inbox</h1>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              We sent a verification link to <span className="font-medium text-slate-700 dark:text-slate-200">{registeredEmail}</span>.
+              Click it to activate your account, then log in.
+            </p>
+            <p className="mt-2 text-xs text-slate-400">Also check your spam folder. The link expires in 24 hours.</p>
+
+            {resent && (
+              <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400">A fresh link has been sent.</p>
+            )}
+
+            <div className="mt-6 flex flex-col gap-2">
+              <Button
+                variant="secondary"
+                loading={resending}
+                onClick={handleResend}
+              >
+                {resent ? 'Send another link' : 'Resend link'}
+              </Button>
+              <Link to="/login" className="text-center text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                Go to login
+              </Link>
+            </div>
+          </div>
+        ) : (
         <div className="card w-full max-w-sm p-8">
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Create your account</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -122,6 +168,7 @@ export default function Register() {
             </Link>
           </p>
         </div>
+        )}
       </div>
     </div>
   );

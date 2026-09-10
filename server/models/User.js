@@ -62,7 +62,13 @@ const userSchema = new mongoose.Schema(
       sessionsPerLongBreak: { type: Number, default: 4 }
     },
     resetPasswordToken: String,
-    resetPasswordExpire: Date
+    resetPasswordExpire: Date,
+    // Email verification. `emailVerified` defaults to true so legacy accounts
+    // (created before this feature) are never locked out; only accounts that
+    // explicitly register after this change are created with `false`.
+    emailVerified: { type: Boolean, default: true },
+    verificationToken: String,
+    verificationExpire: Date
   },
   {
     timestamps: true
@@ -82,12 +88,14 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Return safe user object (no password)
+// Return safe user object (no password / secrets)
 userSchema.methods.toSafeObject = function () {
   const obj = this.toObject();
   delete obj.password;
   delete obj.resetPasswordToken;
   delete obj.resetPasswordExpire;
+  delete obj.verificationToken;
+  delete obj.verificationExpire;
   return obj;
 };
 

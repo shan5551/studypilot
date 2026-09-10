@@ -37,5 +37,19 @@ services:
         sync: false
       - key: GOOGLE_REDIRECT_URI
         sync: false
+      # Email (verification + password reset). Without these, emails are
+      # printed to the server log instead of sent, so registration still works.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_FROM
+        sync: false
     healthCheckPath: /api/health
     # Free plan spins down after inactivity — the first request may be slow.

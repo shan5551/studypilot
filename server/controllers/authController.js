@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
+const { sendEmail } = require('../utils/sendEmail');
 const crypto = require('crypto');
 
 // Parse cookie header into an object (keeps us dependency-free).
@@ -12,7 +13,9 @@ const parseCookies = (header = '') => {
   return out;
 };
 
-// @desc    Register user
+const clientUrl = () => process.env.CLIENT_URL || 'http://localhost:5173';
+
+// @desc    Register user (requires email verification before first login)
 // @route   POST /api/auth/register
 // @access  Public
 const register = async (req, res, next) => {
@@ -27,13 +30,97 @@ const register = async (req, res, next) => {
       });
     }
 
-    const user = await User.create({ name, email, password });
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const user = await User.create({
+      name,
+      email,
+      password,
+      emailVerified: false,
+      verificationToken,
+      verificationExpire: Date.now() + 24 * 60 * 60 * 1000 // 24h
+    });
+
+    const link = `${clientUrl()}/verify-email/${verificationToken}`;
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Verify your StudyPilot account',
+        text: `Hi ${user.name},\n\nWelcome to StudyPilot! Please verify your email to activate your account:\n\n${link}\n\nThis link expires in 24 hours.\nIf you didn't create this account, you can ignore this email.`,
+        html: `<p>Hi ${user.name},</p><p>Welcome to StudyPilot! Please verify your email to activate your account:</p><p><a href="${link}">Verify my account</a></p><p>(or open: ${link})</p><p>This link expires in 24 hours.</p>`
+      });
+    } catch (mailErr) {
+      // Email failures must not block registration — the flow stays usable
+      // and a resend option exists. Log for visibility on the server side.
+      console.error(`[mail] verification email failed to send to ${user.email}:`, mailErr.message);
+    }
 
     res.status(201).json({
       success: true,
-      token: generateToken(user._id),
-      user: user.toSafeObject()
+      needsVerification: true,
+      message: 'Account created! Check your inbox (and spam) for a verification link, then log in.'
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify email address via emailed token
+// @route   POST /api/auth/verify-email
+// @access  Public
+const verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+
+    const user = await User.findOne({
+      verificationToken: token,
+      verificationExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'This verification link is invalid or has expired. Please register again to receive a new link.'
+      });
+    }
+
+    user.emailVerified = true;
+    user.verificationToken = undefined;
+    user.verificationExpire = undefined;
+    await user.save();
+
+    res.json({ success: true, message: 'Email verified! You can now log in.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Resend the verification email for an unverified account
+// @route   POST /api/auth/resend-verification
+// @access  Public (only succeeds for unverified accounts)
+const resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    // Do not reveal whether the account exists.
+    if (!user || user.emailVerified) {
+      return res.json({ success: true, message: 'If that account needs verification, a new link has been sent.' });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    user.verificationToken = verificationToken;
+    user.verificationExpire = Date.now() + 24 * 60 * 60 * 1000;
+    await user.save();
+
+    const link = `${clientUrl()}/verify-email/${verificationToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify your StudyPilot account',
+      text: `Hi ${user.name},\n\nHere's a fresh verification link for your StudyPilot account:\n\n${link}\n\nThis link expires in 24 hours.`,
+      html: `<p>Hi ${user.name},</p><p>Here's a fresh verification link for your StudyPilot account:</p><p><a href="${link}">Verify my account</a></p><p>(or open: ${link})</p><p>This link expires in 24 hours.</p>`
+    });
+
+    res.json({ success: true, message: 'If that account needs verification, a new link has been sent.' });
   } catch (error) {
     next(error);
   }
@@ -62,11 +149,93 @@ const login = async (req, res, next) => {
       });
     }
 
+    // Block only accounts explicitly created unverified (legacy accounts,
+    // where the field is undefined, and Google accounts pass through).
+    if (user.emailVerified === false) {
+      return res.status(403).json({
+        success: false,
+        needsVerification: true,
+        error: 'Please verify your email before logging in. Check your inbox (and spam) for the verification link we sent.'
+      });
+    }
+
     res.json({
       success: true,
       token: generateToken(user._id),
       user: user.toSafeObject()
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Request a password reset email
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    // Always respond the same way so we don't leak which emails are registered.
+    if (!user) {
+      return res.json({ success: true, message: 'If an account exists for that email, a reset link has been sent.' });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 min
+    await user.save();
+
+    const link = `${clientUrl()}/reset-password/${resetToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset your StudyPilot password',
+      text: `Hi ${user.name},\n\nWe received a request to reset your StudyPilot password. Click the link below to set a new one:\n\n${link}\n\nThis link expires in 30 minutes. If you didn't request this, you can safely ignore this email.`,
+      html: `<p>Hi ${user.name},</p><p>We received a request to reset your StudyPilot password. Click the link below to set a new one:</p><p><a href="${link}">Reset my password</a></p><p>(or open: ${link})</p><p>This link expires in 30 minutes. If you didn't request this, you can safely ignore this email.</p>`
+    });
+
+    res.json({ success: true, message: 'If an account exists for that email, a reset link has been sent.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Set a new password using a reset token
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'A reset token is required.' });
+    }
+    if (typeof password !== 'string' || password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 8 characters and contain a letter and a number.'
+      });
+    }
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'This reset link is invalid or has expired. Please request a new one.'
+      });
+    }
+
+    user.password = password; // pre-save hook hashes it
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ success: true, message: 'Password updated! You can now log in with your new password.' });
   } catch (error) {
     next(error);
   }
@@ -123,8 +292,7 @@ const googleAuth = async (req, res, next) => {
 // @route   GET /api/auth/google/callback
 // @access  Public
 const googleCallback = async (req, res) => {
-  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-  const fail = (msg) => res.redirect(`${clientUrl}/auth/callback?error=${encodeURIComponent(msg)}`);
+  const fail = (msg) => res.redirect(`${clientUrl()}/auth/callback?error=${encodeURIComponent(msg)}`);
 
   try {
     const { code, state, error } = req.query;
@@ -165,24 +333,27 @@ const googleCallback = async (req, res) => {
     // Find or create the user (match by email or googleId to allow linking).
     let user = await User.findOne({ $or: [{ email: profile.email }, { googleId: profile.sub }] });
     if (!user) {
+      // Google has already verified this email, so mark it verified.
       user = await User.create({
         name: profile.name || profile.email.split('@')[0],
         email: profile.email,
         provider: 'google',
-        googleId: profile.sub
+        googleId: profile.sub,
+        emailVerified: true
       });
     } else if (!user.googleId) {
       user.googleId = profile.sub;
       user.provider = 'google';
+      if (user.emailVerified === false) user.emailVerified = true; // Google verified it
       await user.save();
     }
 
     const token = generateToken(user._id);
     res.clearCookie('sp_oauth_state');
-    res.redirect(`${clientUrl}/auth/callback?token=${encodeURIComponent(token)}`);
+    res.redirect(`${clientUrl()}/auth/callback?token=${encodeURIComponent(token)}`);
   } catch (err) {
     fail(err.message || 'Google login failed. Please try again.');
   }
 };
 
-module.exports = { register, login, getMe, googleAuth, googleCallback };
+module.exports = { register, login, verifyEmail, resendVerification, forgotPassword, resetPassword, getMe, googleAuth, googleCallback };

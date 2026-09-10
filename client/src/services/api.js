@@ -56,7 +56,11 @@ export async function api(path, { method = 'GET', body, params } = {}) {
 export const authApi = {
   register: (payload) => api('/auth/register', { method: 'POST', body: payload }),
   login: (payload) => api('/auth/login', { method: 'POST', body: payload }),
-  me: () => api('/auth/me')
+  me: () => api('/auth/me'),
+  verifyEmail: (token) => api('/auth/verify-email', { method: 'POST', body: { token } }),
+  resendVerification: (email) => api('/auth/resend-verification', { method: 'POST', body: { email } }),
+  forgotPassword: (email) => api('/auth/forgot-password', { method: 'POST', body: { email } }),
+  resetPassword: (token, password) => api('/auth/reset-password', { method: 'POST', body: { token, password } })
 };
 
 export const subjectApi = {

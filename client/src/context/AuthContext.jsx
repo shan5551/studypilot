@@ -42,12 +42,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async (name, email, password) => {
+    // Registration requires email verification — the server returns a message,
+    // not a token. Do NOT log the user in until they've verified their email.
     const res = await authApi.register({ name, email, password });
-    setToken(res.data.token);
-    setUser(res.data.user);
-    localStorage.setItem('sp_token', res.data.token);
-    localStorage.setItem('sp_user', JSON.stringify(res.data.user));
-    return res.data.user;
+    return res.data;
   }, []);
 
   // Complete a Google OAuth login: store token, then fetch the user.
